@@ -10,6 +10,8 @@ target 'socialGoals' do
   pod 'Firebase/Analytics'
   pod 'Firebase/Auth'
   pod 'Firebase/Firestore'
+  pod 'Firebase/Storage'
+  pod 'FirebaseUI/Storage'
 
   pod 'FBSDKCoreKit'
   pod 'FBSDKLoginKit'
