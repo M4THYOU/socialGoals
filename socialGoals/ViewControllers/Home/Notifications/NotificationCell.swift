@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Mixpanel
 
 protocol NotificationCellDelegate {
     func showProfileVC(username: String, isMyProfile: Bool)
@@ -15,6 +16,7 @@ protocol NotificationCellDelegate {
 class NotificationCell: UICollectionViewCell {
     
     var delegate: NotificationCellDelegate?
+    var isAccepted: Bool?
     
     var data: NotificationCellData? {
         didSet {
@@ -34,7 +36,7 @@ class NotificationCell: UICollectionViewCell {
             if let category = data.listCategory {
                 backgroundColor = listCategoryToColor(category: category)
             }*/
-            //let isRead = data.isRead
+            let isRead = data.isRead
             
             usernameButton.setTitle(username, for: .normal)
             
@@ -50,6 +52,15 @@ class NotificationCell: UICollectionViewCell {
                 addSubview(acceptButton)
                 _ = acceptButton.anchor(top: nil, left: nil, bottom: nil, right: rightAnchor, topConstant: 0, leftConstant: 0, bottomConstant: 0, rightConstant: -15, widthConstant: 0, heightConstant: 0)
                 acceptButton.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
+                
+                if isRead {
+                    acceptButton.setTitle("Accepted", for: .normal)
+                    acceptButton.setTitleColor(.white, for: .normal)
+                    acceptButton.backgroundColor = Colors.brandTurquoiseBlue
+                }
+                
+                isAccepted = isRead
+                
             }
             
         }
@@ -93,7 +104,7 @@ class NotificationCell: UICollectionViewCell {
     }()
     
     let acceptButton: UIButton = {
-        let button = UIButton(type: .system)
+        let button = UIButton(type: .custom)
         
         button.setTitle("Accept", for: .normal)
         button.setTitleColor(Colors.brandTurquoiseBlue, for: .normal)
@@ -118,7 +129,35 @@ class NotificationCell: UICollectionViewCell {
     
     @objc func handleAccept() {
         
-        print("ACCEPT")
+        guard let isAccepted = isAccepted else { return }
+        guard let data = data else { return }
+        
+        guard let currentUid = getUid() ?? udGetUser()?.uid else { return }
+        let otherUid = data.uid
+        
+        Mixpanel.mainInstance().track(event: "NotificationsTabCell_invite_request_accpet_button_clicked")
+        
+        if !isAccepted { // if not accepted
+            
+            acceptButton.setTitle("Accepted", for: .normal)
+            acceptButton.setTitleColor(.white, for: .normal)
+            acceptButton.backgroundColor = Colors.brandTurquoiseBlue
+            
+            self.isAccepted = true
+            
+            updateCircleInvite(currentUid: currentUid, otherUid: otherUid, shouldAccept: true)
+            
+        } else {
+            
+            acceptButton.setTitle("Accept", for: .normal)
+            acceptButton.setTitleColor(Colors.brandTurquoiseBlue, for: .normal)
+            acceptButton.backgroundColor = .white
+            
+            self.isAccepted = false
+            
+            updateCircleInvite(currentUid: currentUid, otherUid: otherUid, shouldAccept: true)
+            
+        }
         
     }
     

@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Mixpanel
 
 class NotificationsTab: UIViewController {
     
@@ -54,6 +55,7 @@ class NotificationsTab: UIViewController {
     }()
     
     @objc func handleRefresh() {
+        Mixpanel.mainInstance().track(event: "NotificationsTab_refresh")
         
         if let uid = getUid() {
             getNotifications(uid: uid) { (notificationsList) in
@@ -90,6 +92,11 @@ class NotificationsTab: UIViewController {
         setupViews()
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        Mixpanel.mainInstance().track(event: "notifications_tab_opened")
+    }
+    
     /****************************************************************************************/
     
     func registerCells() {
@@ -113,8 +120,9 @@ class NotificationsTab: UIViewController {
         var newNotifications: [NotificationCellData] = []
         
         for list in notificationsList {
-            print(list)
+            
             guard let username = list["senderUsername"] as? String else { continue }
+            guard let uid = list["senderUid"] as? String else { continue }
             
             let profileImgString = list["profileImgUrl"] as? String
             
@@ -130,7 +138,7 @@ class NotificationsTab: UIViewController {
                 category = stringToListCategory(categoryString: categoryString)
             }
             
-            let currentNotification = NotificationCellData(username: username, profileImgString: profileImgString, notificationType: notificationType, isRead: isRead, listDocId: listDocId, listCategory: category)
+            let currentNotification = NotificationCellData(username: username, uid: uid, profileImgString: profileImgString, notificationType: notificationType, isRead: isRead, listDocId: listDocId, listCategory: category)
             
             newNotifications.append(currentNotification)
             
@@ -161,6 +169,8 @@ extension NotificationsTab: UICollectionViewDataSource {
         let notification = notifications[indexPath.row]
         
         if notification.notificationType == .comment {
+            Mixpanel.mainInstance().track(event: "NotificationsTab_comment_notification_opened")
+            
             guard let docId = notification.listDocId else { return }
             guard let category = notification.listCategory else { return }
             let categoryString = listCategoryToString(category: category)
@@ -183,19 +193,6 @@ extension NotificationsTab: UICollectionViewDataSource {
 extension NotificationsTab: UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        
-        /*
-        let width = view.frame.width
-        let estimatedSize = CGSize(width: width, height: 150)
-        
-        let attributes = [NSAttributedString.Key.font: UIFont.systemFont(ofSize: 16)]
-        let estimatedFrame = NSString(string: comments[notifications.row].comment).boundingRect(with: estimatedSize, options: .usesLineFragmentOrigin, attributes: attributes, context: nil)
-        
-        // 60px accounts for the profile image above the comment
-        // 30px accounts for extra space needed
-        let baseSize: CGFloat = 55
-        let additionalMargin: CGFloat = 20
-        return CGSize(width: width, height: estimatedFrame.size.height + baseSize + additionalMargin)*/
         return CGSize(width: view.frame.width, height: 80)
     }
     
@@ -209,6 +206,7 @@ extension NotificationsTab: UICollectionViewDelegateFlowLayout {
 extension NotificationsTab: NotificationCellDelegate {
     
     func showProfileVC(username: String, isMyProfile: Bool) {
+        Mixpanel.mainInstance().track(event: "NotificationsTab_profileVC_opened")
         let profileVC = ProfileVC()
             
         profileVC.username = username

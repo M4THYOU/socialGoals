@@ -143,7 +143,9 @@ func checkIfUsernameExists(username: String, exists: @escaping (Bool) -> ()) {
 func setUserUsername(uid: String, username: String) {
     // listUsers, users, usernames (not allowed to change usernames YET)
     let userData: [String: Any] = [
-        "username": username
+        "username": username,
+        "usernameLower": username.lowercased(),
+        "uid": uid
     ]
     
     let userDataForUsernames: [String: Any] = [
@@ -245,10 +247,34 @@ func createNewList(uid: String, list: MyListCellData) {
 
 /**********/
 
+func isInCircle(currentUid: String, otherUid: String, inCircle: @escaping (Bool) -> ()) {
+    
+    let currentUserCircleRef = db.collection("users").document(currentUid).collection("circleUsers").document(otherUid)
+    
+    currentUserCircleRef.getDocument { (docSnapshot, error) in
+        
+        if let error = error {
+            print("Error checking is user is in circle: \(error)")
+            inCircle(false)
+        }
+        
+        if let doc = docSnapshot?.data() {
+            guard let isInvite = doc["isInvite"] as? Bool else { inCircle(false); return }
+            
+            inCircle(!isInvite)
+            
+        } else {
+            inCircle(false)
+        }
+        
+    }
+    
+}
+
 func getUserLists(uid: String, complete: @escaping ([Dictionary<String, Any>]) -> ()) {
     
-    let userRef = db.collection("users").document(uid)
-    let userListsRef = userRef.collection("lists")
+    let otherUserRef = db.collection("users").document(uid)
+    let userListsRef = otherUserRef.collection("lists")
     let orderedUserListsRef = userListsRef.order(by: "lastUpdated", descending: true)
     
     orderedUserListsRef.getDocuments { (querySnapshot, error) in
@@ -266,6 +292,8 @@ func getUserLists(uid: String, complete: @escaping ([Dictionary<String, Any>]) -
                 
                 if shouldReset {
                     docDict["goalCompletions"] = [false, false, false]
+                    docDict["numberOfComments"] = 0
+                    resetComments(docDict: docDict, uid: uid)
                 }
                 
                 lists.append(docDict)
@@ -303,6 +331,8 @@ func getDiscoverLists(uid: String, complete: @escaping ([Dictionary<String, Any>
                     
                     if shouldReset {
                         docDict["goalCompletions"] = [false, false, false]
+                        docDict["numberOfComments"] = 0
+                        resetComments(docDict: docDict, uid: uid)
                     }
                     
                     lists.append(docDict)
@@ -343,6 +373,80 @@ func checkDailyList(docDict: Dictionary<String, Any>, uid: String) -> Bool {
     }
     
     return false
+    
+}
+
+func resetComments(docDict: Dictionary<String, Any>, uid: String) {
+    
+    guard let uid = docDict["uid"] as? String else { return }
+    guard let docId = docDict["docId"] as? String else { return }
+    guard let categoryString = docDict["categoryString"] as? String else { return }
+    
+    updateLists(uid: uid, docId: docId, categoryString: categoryString, updateDict: ["numberOfComments": 0])
+    
+    let listsCollection = db.collection("lists").document(docId)
+    let listsCollectionComments = listsCollection.collection("comments")
+    listsCollectionComments.getDocuments { (querySnapshot, error) in
+        
+        if let error = error {
+            print("Error deleting comments from lists collection: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                let docDict = doc.data()
+                guard let commentDocId = docDict["docId"] as? String else { continue }
+                listsCollectionComments.document(commentDocId).delete()
+            }
+        }
+        
+    }
+    
+    let categoryCollection = db.collection(categoryString).document(docId)
+    let categoryCollectionComments = categoryCollection.collection("comments")
+    categoryCollectionComments.getDocuments { (querySnapshot, error) in
+        
+        if let error = error {
+            print("Error deleting comments from category collection: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                let docDict = doc.data()
+                guard let commentDocId = docDict["docId"] as? String else { continue }
+                categoryCollectionComments.document(commentDocId).delete()
+            }
+        }
+        
+    }
+    
+    let userCollection = db.collection("users").document(uid).collection("lists").document(docId)
+    let userCollectionComments = userCollection.collection("comments")
+    userCollectionComments.getDocuments { (querySnapshot, error) in
+        
+        if let error = error {
+            print("Error deleting comments from user: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                let docDict = doc.data()
+                guard let commentDocId = docDict["docId"] as? String else { continue }
+                userCollectionComments.document(commentDocId).delete()
+            }
+        }
+        
+    }
+    
+    let userCategoryCollection = db.collection("users").document(uid).collection(categoryString).document(docId)
+    let userCategoryCollectionComments = userCategoryCollection.collection("comments")
+    userCategoryCollectionComments.getDocuments { (querySnapshot, error) in
+        
+        if let error = error {
+            print("Error deleting comments from user's category collection: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                let docDict = doc.data()
+                guard let commentDocId = docDict["docId"] as? String else { continue }
+                userCategoryCollectionComments.document(commentDocId).delete()
+            }
+        }
+        
+    }
     
 }
 
@@ -767,6 +871,113 @@ func removeFromCircle(currentUid: String, otherUid: String) {
         }
     }
     
+    // now delete the notification. Do it from both users. Even though the notification won't be in both, idk which one it will be.
+    let currentUserNotificationRef = db.collection("users").document(currentUid).collection("notifications").document(otherUid)
+    let otherUserNotificationRef = db.collection("users").document(otherUid).collection("notifications").document(currentUid)
+    
+    currentUserNotificationRef.delete { (error) in
+        if let error = error {
+            print("Error deleting invite notification from self \(error)")
+        }
+    }
+    
+    otherUserNotificationRef.delete { (error) in
+        if let error = error {
+            print("Error deleting invite notification from user \(error)")
+        }
+    }
+    
+}
+
+func updateCircleInvite(currentUid: String, otherUid: String, shouldAccept: Bool) {
+    // called only from notifications tab.
+    
+    // change isInvite to !shouldAccept in circleUsers for currentUser and otherUser
+    // change isRead to shouldAccept in currentUser notification doc, titled otherUid.
+    
+    let updatedNotification: Dictionary<String, Any> = [
+        "isRead": shouldAccept
+    ]
+    
+    let updatedCircleUsers: Dictionary<String, Any> = [
+        "isInvite": !shouldAccept
+    ]
+    
+    let currentUserNotificationRef = db.collection("users").document(currentUid).collection("notifications").document(otherUid)
+    let currentUserCircleRef = db.collection("users").document(currentUid).collection("circleUsers").document(otherUid)
+    let otherUserCircleRef = db.collection("users").document(otherUid).collection("circleUsers").document(currentUid)
+    
+    currentUserNotificationRef.updateData(updatedNotification) { (error) in
+        if let error = error {
+            print("Error updating invite notification: \(error)")
+        }
+    }
+    
+    currentUserCircleRef.updateData(updatedCircleUsers) { (error) in
+        if let error = error {
+            print("Error updating circleUsers for self: \(error)")
+        }
+    }
+    
+    otherUserCircleRef.updateData(updatedCircleUsers) { (error) in
+        if let error = error {
+            print("Error updating circleUsers for user: \(error)")
+        }
+    }
+    
 }
 
 // END circle invitations
+
+func getCircleUsers(uid: String, complete: @escaping ([Dictionary<String, Any>]) -> ()) {
+    
+    let userRef = db.collection("users").document(uid)
+    let circleUsersRef = userRef.collection("circleUsers")
+    let orderedCircleUsersRef = circleUsersRef.order(by: "timestamp", descending: true).whereField("isInvite", isEqualTo: false)
+    
+    orderedCircleUsersRef.getDocuments { (querySnapshot, error) in
+        
+        var circleUsers: [Dictionary<String, Any>] = []
+        
+        if let error = error {
+            print("Error getting circleUsers: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                
+                let docDict = doc.data()
+                circleUsers.append(docDict)
+                
+            }
+        }
+        
+        complete(circleUsers)
+        
+    }
+    
+}
+
+func searchUsers(usernameText: String, complete: @escaping ([Dictionary<String, Any>]) -> ()) {
+    
+    let lowercasedQuery = usernameText.lowercased()
+    let searchRef = db.collection("listUsers").whereField("usernameLower", isEqualTo: lowercasedQuery)
+    
+    searchRef.getDocuments { (querySnapshot, error) in
+        
+        var users: [Dictionary<String, Any>] = []
+        
+        if let error = error {
+            print("Error searching users: \(error)")
+        } else {
+            for doc in querySnapshot!.documents {
+                
+                let docDict = doc.data()
+                
+                users.append(docDict)
+            }
+        }
+        
+        complete(users)
+        
+    }
+    
+}

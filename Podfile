@@ -19,4 +19,6 @@ target 'socialGoals' do
 
   pod 'GoogleSignIn'
 
+  pod 'Mixpanel-swift'
+
 end

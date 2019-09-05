@@ -8,12 +8,15 @@
 
 import UIKit
 import FirebaseUI
+import Mixpanel
 
 protocol MyListCellDelegate: class {
     func showPrivacyActionSheet(sender: UIButton, currentCell: MyListCell)
     func showMoreActionSheet(currentCell: MyListCell)
     func showProfileVC(username: String, isMyProfile: Bool)
     func showCommentsVC(uid: String, docId: String, categoryString: String)
+    
+    func showShareDialog(username: String)
 }
 
 class MyListCell: UICollectionViewCell {
@@ -234,8 +237,12 @@ class MyListCell: UICollectionViewCell {
     }
     
     @objc func handleCheckbox(sender: CheckBox) {
+        Mixpanel.mainInstance().track(event: "MyListCell_checkbox_clicked")
+        
         let listIndex = sender.listIndex ?? 0
         let isChecked = sender.isChecked
+        
+        isAllChecked()
         
         if let data = data {
             guard let currentDocId = data.docId else { return }
@@ -349,6 +356,24 @@ class MyListCell: UICollectionViewCell {
         
         _ = checkBoxC.anchor(top: goalB.bottomAnchor, left: goalsArea.leftAnchor, bottom: nil, right: nil, topConstant: 0, leftConstant: 5, bottomConstant: 0, rightConstant: 0, widthConstant: 30, heightConstant: 30)
         _ = goalC.anchor(top: goalB.bottomAnchor, left: checkBoxC.rightAnchor, bottom: nil, right: goalsArea.rightAnchor, topConstant: 0, leftConstant: 7, bottomConstant: 0, rightConstant: -5, widthConstant: 0, heightConstant: 0)
+        
+    }
+    
+    func isAllChecked() {
+        
+        let isAGood = checkBoxA.isHidden || checkBoxA.isChecked
+        let isBGood = checkBoxB.isHidden || checkBoxB.isChecked
+        let isCGood = checkBoxC.isHidden || checkBoxC.isChecked
+        
+        if isAGood && isBGood && isCGood {
+            
+            guard let data = data else { return }
+            
+            if let del = delegate {
+                del.showShareDialog(username: data.username)
+            }
+            
+        }
         
     }
     

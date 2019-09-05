@@ -8,6 +8,7 @@
 
 import UIKit
 import Firebase
+import Mixpanel
 
 class MyGoalsTab: UIViewController {
     
@@ -57,6 +58,7 @@ class MyGoalsTab: UIViewController {
     }()
     
     @objc func handleRefresh() {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_refresh")
         
         if let uid = getUid() {
             getUserLists(uid: uid) { (listsList) in
@@ -70,6 +72,8 @@ class MyGoalsTab: UIViewController {
     }
     
     @objc func handleAddNewList() {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_new_list_builder_opened")
+        
         let addNewGoalVC = AddNewGoal()
         addNewGoalVC.completeDelegate = self
         navigationController?.pushViewController(addNewGoalVC, animated: true)
@@ -98,6 +102,11 @@ class MyGoalsTab: UIViewController {
         
         registerCells()
         setupViews()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_opened")
     }
     
     /****************************************************************************************/
@@ -203,10 +212,13 @@ extension MyGoalsTab: UICollectionViewDelegateFlowLayout {
 extension MyGoalsTab: MyListCellDelegate {
     
     func showPrivacyActionSheet(sender: UIButton, currentCell: MyListCell) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_privacy_action_sheet_shown")
         
         let alert = UIAlertController(title: "Select who can see this list.", message: nil, preferredStyle: .actionSheet)
         
         alert.addAction(UIAlertAction(title: "Public", style: .default, handler: { (action) in
+            Mixpanel.mainInstance().track(event: "MyGoalsTab_list_privacy_changed", properties: ["newPrivacy": "Public"])
+            
             let newPrivacy = ListPrivacy.public_
             let privacyTitle = listPrivacyToString(privacy: newPrivacy)
             sender.setTitle(privacyTitle, for: .normal)
@@ -220,6 +232,8 @@ extension MyGoalsTab: MyListCellDelegate {
         }))
         
         alert.addAction(UIAlertAction(title: "Circle", style: .default, handler: { (action) in
+            Mixpanel.mainInstance().track(event: "MyGoalsTab_list_privacy_changed", properties: ["newPrivacy": "Circle"])
+            
             let newPrivacy = ListPrivacy.circle
             let privacyTitle = listPrivacyToString(privacy: newPrivacy)
             sender.setTitle(privacyTitle, for: .normal)
@@ -233,6 +247,8 @@ extension MyGoalsTab: MyListCellDelegate {
         }))
         
         alert.addAction(UIAlertAction(title: "Myself", style: .default, handler: { (action) in
+            Mixpanel.mainInstance().track(event: "MyGoalsTab_list_privacy_changed", properties: ["newPrivacy": "Myself"])
+            
             let newPrivacy = ListPrivacy.myself
             let privacyTitle = listPrivacyToString(privacy: newPrivacy)
             sender.setTitle(privacyTitle, for: .normal)
@@ -254,10 +270,13 @@ extension MyGoalsTab: MyListCellDelegate {
     }
     
     func showMoreActionSheet(currentCell: MyListCell) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_more_action_sheet_shown")
         
         let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { (action) in
+            Mixpanel.mainInstance().track(event: "MyGoalsTab_list_deleted")
+            
             if let removedIndex = self.collectionView.indexPath(for: currentCell)?.row {
                 self.lists.remove(at: removedIndex)
             }
@@ -280,6 +299,8 @@ extension MyGoalsTab: MyListCellDelegate {
     }
     
     func showProfileVC(username: String, isMyProfile: Bool) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_profileVC_opened")
+        
         let profileVC = ProfileVC()
         
         profileVC.username = username
@@ -289,6 +310,8 @@ extension MyGoalsTab: MyListCellDelegate {
     }
     
     func showCommentsVC(uid: String, docId: String, categoryString: String) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_commentsVC_opened")
+        
         let commentsVC = CommentsVC()
         
         let listData: Dictionary<String, String> = [
@@ -301,11 +324,38 @@ extension MyGoalsTab: MyListCellDelegate {
         navigationController?.pushViewController(commentsVC, animated: true)
     }
     
+    func showShareDialog(username: String) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_completed_list")
+        
+        let alert = UIAlertController(title: "Well Done!", message: "Let your friends and family know how much you've accomplished and invite them to socialGoals.", preferredStyle: .alert)
+        
+        alert.addAction(UIAlertAction(title: "Later", style: .default, handler: nil))
+        alert.addAction(UIAlertAction(title: "Share", style: .default, handler: { (_) in
+            Mixpanel.mainInstance().track(event: "MyGoalsTab_share_complete_list")
+            
+            let textToShare = "I've just completed another list of goals on socialGoals! Come join me, my username is \(username)"
+            let appLink = "https://socialgoals-22f09.web.app"
+            
+            guard let appUrl = URL(string: appLink) else { return }
+            
+            let objectsToShare = [textToShare, appUrl] as [Any]
+            
+            let shareVC = UIActivityViewController(activityItems: objectsToShare, applicationActivities: nil)
+            shareVC.popoverPresentationController?.sourceView = self.collectionView
+            self.present(shareVC, animated: true, completion: nil)
+            
+        }))
+        
+        present(alert, animated: true, completion: nil)
+        
+    }
+    
 }
 
 extension MyGoalsTab: AddNewGoalCompleteDelegate {
     
     func addListToLists(list: MyListCellData) {
+        Mixpanel.mainInstance().track(event: "MyGoalsTab_new_list_added")
         lists.append(list)
     }
     

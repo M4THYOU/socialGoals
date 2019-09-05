@@ -8,6 +8,7 @@
 
 import UIKit
 import Firebase
+import Mixpanel
 
 class CommentsVC: UIViewController {
     
@@ -222,6 +223,7 @@ extension CommentsVC: UITextFieldDelegate {
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        Mixpanel.mainInstance().track(event: "CommentsVC_send_button_pressed")
         
         if isValidComment() {
             if let currentUid = getUid() {
@@ -256,6 +258,8 @@ extension CommentsVC: UITextFieldDelegate {
 extension CommentsVC: CommentCellDelegate {
     
     func showProfileVC(username: String, isMyProfile: Bool) {
+        Mixpanel.mainInstance().track(event: "CommentsVC_profileVC_opened")
+        
         let profileVC = ProfileVC()
         
         profileVC.username = username

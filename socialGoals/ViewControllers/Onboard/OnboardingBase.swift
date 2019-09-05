@@ -8,7 +8,7 @@
 
 import UIKit
 import FirebaseAuth
-
+import Mixpanel
 
 class OnboardingBase: UIViewController {
     
@@ -59,6 +59,7 @@ class OnboardingBase: UIViewController {
         //last screen
         if pageControl.currentPage == numberOfPages - 1 {
             navigationController?.popViewController(animated: true)
+            Mixpanel.mainInstance().track(event: "onboard_complete")
             return
         }
         
@@ -67,6 +68,7 @@ class OnboardingBase: UIViewController {
             return
         }
         
+        Mixpanel.mainInstance().track(event: "onboard_username_set")
         checkUsername()
         
     }

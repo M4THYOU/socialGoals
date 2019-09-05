@@ -8,6 +8,7 @@
 
 import UIKit
 import Firebase
+import Mixpanel
 
 class SingleListVC: UIViewController {
     
@@ -350,6 +351,7 @@ class SingleListVC: UIViewController {
     }
     
     func showProfileVC(username: String, isMyProfile: Bool) {
+        Mixpanel.mainInstance().track(event: "SingleListVC_profileVC_opened")
         let profileVC = ProfileVC()
         
         profileVC.username = username
@@ -359,6 +361,7 @@ class SingleListVC: UIViewController {
     }
     
     func showCommentsVC(uid: String, docId: String, categoryString: String) {
+        Mixpanel.mainInstance().track(event: "SingleListVC_commentsVC_opened")
         let commentsVC = CommentsVC()
         
         let listData: Dictionary<String, String> = [

@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Mixpanel
 
 protocol InviteFriendsCellDelegate: class {
     func showShareDialog()
@@ -44,6 +45,8 @@ class InviteFriendsCell: UICollectionViewCell {
     }()
     
     @objc func handleInviteButton() {
+        
+        Mixpanel.mainInstance().track(event: "onboard_share")
         
         if let del = delegate {
             del.showShareDialog()

@@ -15,6 +15,7 @@ enum NotificationType {
 
 struct NotificationCellData {
     let username: String
+    let uid: String
     let profileImgString: String?
     let notificationType: NotificationType
     let isRead: Bool

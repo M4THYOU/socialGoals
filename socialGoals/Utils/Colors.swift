@@ -25,5 +25,6 @@ struct Colors {
     static let warningRed = rgb(r: 179, g: 58, b: 58) // hex: #b33a3a
     
     static let almostWhite = rgb(r: 248, g: 248, b: 248) // hex: #fafafa
+    static let almostWhiteDarker = rgb(r: 235, g: 235, b: 235) // hex: #ebebeb
     
 }

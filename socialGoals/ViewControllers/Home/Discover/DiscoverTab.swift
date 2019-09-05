@@ -8,6 +8,7 @@
 
 import UIKit
 import Firebase
+import Mixpanel
 
 // get lists that are not mine AND are Public
 class DiscoverTab: UIViewController {
@@ -57,7 +58,25 @@ class DiscoverTab: UIViewController {
         return refresh
     }()
     
+    lazy var searchController: UISearchController = {
+        let controller = SearchResultsController()
+        controller.delegate = self
+        let search = UISearchController(searchResultsController: controller)
+        
+        search.hidesNavigationBarDuringPresentation = true
+        
+        search.searchBar.returnKeyType = .search
+        search.searchBar.searchBarStyle = .minimal
+        search.searchBar.autocorrectionType = .no
+        search.searchBar.autocapitalizationType = .none
+        
+        search.searchBar.delegate = self
+        
+        return search
+    }()
+    
     @objc func handleRefresh() {
+        Mixpanel.mainInstance().track(event: "DiscoverTab_refresh")
         
         if let uid = getUid() {
             getDiscoverLists(uid: uid) { (listsList) in
@@ -81,6 +100,10 @@ class DiscoverTab: UIViewController {
         navigationController?.navigationBar.tintColor = Colors.brandTurquoiseBlue
         edgesForExtendedLayout = []
         
+        navigationItem.searchController = searchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        definesPresentationContext = true
+        
         loadingSpinner.startAnimating()
         
         if let uid = getUid() {
@@ -92,6 +115,11 @@ class DiscoverTab: UIViewController {
         
         registerCells()
         setupViews()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        Mixpanel.mainInstance().track(event: "DiscoverTab_opened")
     }
     
     /****************************************************************************************/
@@ -154,6 +182,30 @@ class DiscoverTab: UIViewController {
         
     }
     
+    func updateUsers(usersList: [Dictionary<String, Any>]) {
+        
+        var newResults: [SearchResultsCellData] = []
+        
+        for user in usersList {
+            
+            guard let username = user["username"] as? String else { continue }
+            guard let uid = user["uid"] as? String else { return }
+            
+            let profileImgUrl = user["profileImgUrl"] as? String
+            
+            let currentUser = SearchResultsCellData(username: username, uid: uid, profileImgString: profileImgUrl)
+            newResults.append(currentUser)
+            
+        }
+        
+        if let controller = searchController.searchResultsController as? SearchResultsController {
+            controller.searchResultsTable.users = newResults
+        } else {
+            print("ERROR getting SearchResultsController")
+        }
+        
+    }
+    
 }
 
 extension DiscoverTab: UICollectionViewDataSource {
@@ -186,9 +238,34 @@ extension DiscoverTab: UICollectionViewDelegateFlowLayout {
     
 }
 
+extension DiscoverTab: UISearchBarDelegate {
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        Mixpanel.mainInstance().track(event: "DiscoverTab_search_text_entered")
+    }
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        Mixpanel.mainInstance().track(event: "DiscoverTab_search_button_pressed")
+        
+        let searchText = searchBar.text ?? ""
+        
+        if searchText.isEmpty {
+            return
+        }
+        
+        searchUsers(usernameText: searchText) { (usersList) in
+            self.updateUsers(usersList: usersList)
+        }
+        
+    }
+    
+}
+
 extension DiscoverTab: ListCellDelegate {
     
     func showProfileVC(username: String, isMyProfile: Bool) {
+        Mixpanel.mainInstance().track(event: "DiscoverTab_profileVC_opened")
+        
         let profileVC = ProfileVC()
         
         profileVC.username = username
@@ -198,6 +275,8 @@ extension DiscoverTab: ListCellDelegate {
     }
     
     func showCommentsVC(uid: String, docId: String, categoryString: String) {
+        Mixpanel.mainInstance().track(event: "DiscoverTab_commentsVC_opened")
+        
         let commentsVC = CommentsVC()
         
         let listData: Dictionary<String, String> = [
@@ -209,5 +288,11 @@ extension DiscoverTab: ListCellDelegate {
         
         navigationController?.pushViewController(commentsVC, animated: true)
     }
+    
+}
+
+extension DiscoverTab: SearchResultsControllerDelegate {
+    
+    //func showProfileVC(username: String, isMyProfile: Bool) {} // already implemented in ListCellDelegate
     
 }
